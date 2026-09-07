@@ -12,7 +12,7 @@ tape.test("converters", function(test) {
 
         test.test(test.name + " - Message#toObject", function(test) {
 
-            test.plan(6);
+            test.plan(7);
 
             test.test(test.name + " - called with defaults = true", function(test) {
                 var obj = Message.toObject(Message.create(), { defaults: true });
@@ -147,6 +147,53 @@ tape.test("converters", function(test) {
 
                 test.end();
             });            
+
+            test.test(test.name + " - Message.toObject with bytes array defaults", function(test) {
+                var root = protobuf.Root.fromJSON({
+                    nested: {
+                        Defaults: {
+                            fields: {
+                                bytes: {
+                                    type: "bytes",
+                                    id: 1,
+                                    options: {
+                                        "default": [ "not_a_number" ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                var Defaults = root.lookupType("Defaults");
+                var obj = Defaults.toObject({}, { defaults: true, bytes: Array });
+
+                test.same(obj.bytes, [ "not_a_number" ], "should preserve bytes array defaults");
+
+                // the default used to be joined into the generated toObject source
+                // verbatim, so a crafted schema default executed as JavaScript
+                var injectedRoot = protobuf.Root.fromJSON({
+                    nested: {
+                        Injected: {
+                            fields: {
+                                bytes: {
+                                    type: "bytes",
+                                    id: 1,
+                                    options: {
+                                        "default": [ "global.$codeInjectedByToObject=true" ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                var Injected = injectedRoot.lookupType("Injected");
+                var injectedObj = Injected.toObject({}, { defaults: true, bytes: Array });
+
+                test.same(injectedObj.bytes, [ "global.$codeInjectedByToObject=true" ], "should not inline bytes defaults as code");
+                test.equal(global.$codeInjectedByToObject, undefined, "should not execute crafted bytes defaults");
+
+                test.end();
+            });
 
         });
 
